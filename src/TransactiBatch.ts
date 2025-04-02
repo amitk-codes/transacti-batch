@@ -1,6 +1,7 @@
-import { Contract, ethers, Signer } from "ethers";
+import { BigNumber, Contract, ethers, Signer } from "ethers";
 import { SdkConfig } from "./types";
 import MULTI_SEND_ABI from './abi/multiSendAbi.json';
+import { getRecommendedGasPrice } from "./utils/gasEstimator";
 
 
 export class TransactiBatch {
@@ -61,4 +62,17 @@ export class TransactiBatch {
   getContractAddress(): string {
     return this.contractAddress;
   }
+
+  /**
+   * Get recommended gas prices based on current network conditions
+   * @returns A promise that resolves to an object with different gas price options
+ */
+  async getGasPrices(): Promise<{
+    slow: BigNumber;
+    average: BigNumber;
+    fast: BigNumber;
+  }> {
+    return getRecommendedGasPrice(this.provider);
+  }
+
 }
