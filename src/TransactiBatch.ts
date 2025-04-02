@@ -2,7 +2,7 @@ import { BigNumber, Contract, ethers, Signer } from "ethers";
 import { EthBatchParams, EthEqualBatchParams, GasEstimation, MixedBatchParams, MixedEqualBatchParams, SdkConfig, TokenBatchParams, TokenEqualBatchParams, TransactionOptions } from "./types";
 import MULTI_SEND_ABI from './abi/multiSendAbi.json';
 import { estimateGas, getRecommendedGasPrice } from "./utils/gasEstimator";
-import { hasEnoughAllowance } from "./utils/erc20";
+import { getERC20Contract, hasEnoughAllowance } from "./utils/erc20";
 
 
 export class TransactiBatch {
@@ -562,6 +562,100 @@ export class TransactiBatch {
       totalEthValue.toString(),
       options
     );
+  }
+
+  /**
+   * Send ETH to two recipients
+   * @param recipient1 First recipient address
+   * @param amount1 Amount to send to first recipient (in wei)
+   * @param recipient2 Second recipient address
+   * @param amount2 Amount to send to second recipient (in wei)
+   * @param options Transaction options
+   * @returns A promise that resolves to the transaction response
+   */
+  async sendEthToTwo(
+    recipient1: string,
+    amount1: string,
+    recipient2: string,
+    amount2: string,
+    options: TransactionOptions = {}
+  ): Promise<ethers.providers.TransactionResponse> {
+    // Calculate total value to send
+    const amount1BN = ethers.BigNumber.from(amount1);
+    const amount2BN = ethers.BigNumber.from(amount2);
+    const totalValue = amount1BN.add(amount2BN);
+
+    // Set transaction options
+    const txOptions = {
+      gasLimit: options.gasLimit || this.defaultGasLimit,
+      gasPrice: options.gasPrice || this.defaultGasPrice,
+      value: totalValue.toString(),
+      nonce: options.nonce
+    };
+
+    // Send the transaction
+    return this.contract.transfer2(recipient1, amount1BN, recipient2, amount2BN, txOptions);
+  }
+
+  /**
+   * Estimate gas for sending ETH to two recipients
+   * @param recipient1 First recipient address
+   * @param amount1 Amount to send to first recipient (in wei)
+   * @param recipient2 Second recipient address
+   * @param amount2 Amount to send to second recipient (in wei)
+   * @param options Transaction options
+   * @returns A promise that resolves to a GasEstimation object
+   */
+  async estimateEthToTwoGas(
+    recipient1: string,
+    amount1: string,
+    recipient2: string,
+    amount2: string,
+    options: TransactionOptions = {}
+  ): Promise<GasEstimation> {
+    // Calculate total value to send
+    const amount1BN = ethers.BigNumber.from(amount1);
+    const amount2BN = ethers.BigNumber.from(amount2);
+    const totalValue = amount1BN.add(amount2BN);
+
+    return estimateGas(
+      this.contract,
+      'transfer2',
+      [recipient1, amount1BN, recipient2, amount2BN],
+      totalValue.toString(),
+      options
+    );
+  }
+
+  /**
+   * Helper method to approve ERC-20 token spending for the MultiSend contract
+   * @param tokenAddress The ERC-20 token address
+   * @param amount The amount to approve (in token's smallest unit)
+   * @param options Transaction options
+   * @returns A promise that resolves to the transaction response
+   */
+  async approveTokenSpending(
+    tokenAddress: string,
+    amount: string,
+    options: TransactionOptions = {}
+  ): Promise<ethers.providers.TransactionResponse> {
+    // Ensure we have a signer
+    if (!this.contract.signer) {
+      throw new Error('No signer provided. Call connect() to provide a signer.');
+    }
+
+    // Create a token contract instance connected to the signer
+    const tokenContract = getERC20Contract(tokenAddress, this.contract.signer);
+
+    // Set transaction options
+    const txOptions = {
+      gasLimit: options.gasLimit || 60000, // Typical gas limit for approve
+      gasPrice: options.gasPrice || this.defaultGasPrice,
+      nonce: options.nonce
+    };
+
+    // Approve the batch contract to spend tokens
+    return tokenContract.approve(this.contractAddress, amount, txOptions);
   }
 
 
