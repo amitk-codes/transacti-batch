@@ -1,5 +1,5 @@
 import { BigNumber, Contract, ethers, Signer } from "ethers";
-import { EthBatchParams, EthEqualBatchParams, GasEstimation, SdkConfig, TokenBatchParams, TokenEqualBatchParams, TransactionOptions } from "./types";
+import { EthBatchParams, EthEqualBatchParams, GasEstimation, MixedBatchParams, SdkConfig, TokenBatchParams, TokenEqualBatchParams, TransactionOptions } from "./types";
 import MULTI_SEND_ABI from './abi/multiSendAbi.json';
 import { estimateGas, getRecommendedGasPrice } from "./utils/gasEstimator";
 import { hasEnoughAllowance } from "./utils/erc20";
@@ -373,6 +373,104 @@ export class TransactiBatch {
       'multiTransferTokenEqual_71p',
       [tokenAddress, addresses, amountBN],
       '0',
+      options
+    );
+  }
+
+
+  /**
+ * Send both ERC-20 tokens and ETH to multiple recipients with different amounts
+ * @param params Parameters for the batch transaction
+ * @param options Transaction options
+ * @returns A promise that resolves to the transaction response
+ */
+  async sendMixedBatch(
+    params: MixedBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<ethers.providers.TransactionResponse> {
+    const { tokenAddress, recipients } = params;
+
+    if (!recipients || recipients.length === 0) {
+      throw new Error('No recipients provided');
+    }
+
+    // Ensure the contract has a signer
+    if (!this.contract.signer) {
+      throw new Error('No signer provided. Call connect() to provide a signer.');
+    }
+
+    // Split addresses, token amounts, and ETH amounts
+    const addresses = recipients.map(r => r.address);
+    const tokenAmounts = recipients.map(r => ethers.BigNumber.from(r.tokenAmount));
+    const ethAmounts = recipients.map(r => ethers.BigNumber.from(r.ethAmount));
+
+    // Calculate total token amount and ETH value
+    const totalTokenAmount = tokenAmounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+    const totalEthValue = ethAmounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+
+    // Check allowance
+    const signerAddress = await this.contract.signer.getAddress();
+    const hasAllowance = await hasEnoughAllowance(
+      tokenAddress,
+      signerAddress,
+      this.contractAddress,
+      totalTokenAmount,
+      this.provider
+    );
+
+    if (!hasAllowance) {
+      throw new Error(`Insufficient token allowance. Please approve the contract to spend at least ${totalTokenAmount.toString()} tokens.`);
+    }
+
+    // Set transaction options
+    const txOptions = {
+      gasLimit: options.gasLimit || this.defaultGasLimit,
+      gasPrice: options.gasPrice || this.defaultGasPrice,
+      value: totalEthValue.toString(),
+      nonce: options.nonce
+    };
+
+    // Send the transaction
+    return this.contract.multiTransferTokenEther(
+      tokenAddress,
+      addresses,
+      tokenAmounts,
+      totalTokenAmount,
+      ethAmounts,
+      txOptions
+    );
+  }
+
+  /**
+   * Estimate gas for mixed (token + ETH) batch transaction
+   * @param params Parameters for the batch transaction
+   * @param options Transaction options
+   * @returns A promise that resolves to a GasEstimation object
+   */
+  async estimateMixedBatchGas(
+    params: MixedBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<GasEstimation> {
+    const { tokenAddress, recipients } = params;
+
+    if (!recipients || recipients.length === 0) {
+      throw new Error('No recipients provided');
+    }
+
+    // Split addresses, token amounts, and ETH amounts
+    const addresses = recipients.map(r => r.address);
+    const tokenAmounts = recipients.map(r => ethers.BigNumber.from(r.tokenAmount));
+    const ethAmounts = recipients.map(r => ethers.BigNumber.from(r.ethAmount));
+
+    // Calculate total token amount and ETH value
+    const totalTokenAmount = tokenAmounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+    const totalEthValue = ethAmounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+
+    return estimateGas(
+      this.contract,
+      'multiTransferTokenEther',
+      [tokenAddress, addresses, tokenAmounts, totalTokenAmount, ethAmounts],
+      totalEthValue.toString(),
       options
     );
   }
