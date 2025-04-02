@@ -41,6 +41,13 @@ export interface MixedBatchParams {
   }[];
 }
 
+export interface MixedEqualBatchParams {
+  tokenAddress: string;
+  addresses: string[];
+  tokenAmount: string; // in token minimal unit
+  ethAmount: string; // in wei
+}
+
 export interface TransactionOptions {
   gasLimit?: number;
   gasPrice?: string;
