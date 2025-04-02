@@ -1,7 +1,7 @@
 import { BigNumber, Contract, ethers, Signer } from "ethers";
-import { SdkConfig } from "./types";
+import { EthBatchParams, GasEstimation, SdkConfig, TransactionOptions } from "./types";
 import MULTI_SEND_ABI from './abi/multiSendAbi.json';
-import { getRecommendedGasPrice } from "./utils/gasEstimator";
+import { estimateGas, getRecommendedGasPrice } from "./utils/gasEstimator";
 
 
 export class TransactiBatch {
@@ -73,6 +73,73 @@ export class TransactiBatch {
     fast: BigNumber;
   }> {
     return getRecommendedGasPrice(this.provider);
+  }
+
+  /**
+   * Send ETH to multiple recipients with different amounts
+   * @param params Parameters for the batch transaction
+   * @param options Transaction options
+   * @returns A promise that resolves to the transaction response
+   */
+  async sendEthBatch(
+    params: EthBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<ethers.providers.TransactionResponse> {
+    const { recipients } = params;
+
+    if (!recipients || recipients.length === 0) {
+      throw new Error('No recipients provided');
+    }
+
+    // Split addresses and amounts
+    const addresses = recipients.map(r => r.address);
+    const amounts = recipients.map(r => ethers.BigNumber.from(r.amount));
+
+    // Calculate total value to send
+    const totalValue = amounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+
+    // Set transaction options
+    const txOptions = {
+      gasLimit: options.gasLimit || this.defaultGasLimit,
+      gasPrice: options.gasPrice || this.defaultGasPrice,
+      value: totalValue.toString(),
+      nonce: options.nonce
+    };
+
+    // Send the transaction
+    return this.contract.multiTransfer_OST(addresses, amounts, txOptions);
+  }
+
+  /**
+   * Estimate gas for ETH batch transaction
+   * @param params Parameters for the batch transaction
+   * @param options Transaction options
+   * @returns A promise that resolves to a GasEstimation object
+   */
+  async estimateEthBatchGas(
+    params: EthBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<GasEstimation> {
+    const { recipients } = params;
+
+    if (!recipients || recipients.length === 0) {
+      throw new Error('No recipients provided');
+    }
+
+    // Split addresses and amounts
+    const addresses = recipients.map(r => r.address);
+    const amounts = recipients.map(r => ethers.BigNumber.from(r.amount));
+
+    // Calculate total value to send
+    const totalValue = amounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+
+    return estimateGas(
+      this.contract,
+      'multiTransfer_OST',
+      [addresses, amounts],
+      totalValue.toString(),
+      options
+    );
   }
 
 }
