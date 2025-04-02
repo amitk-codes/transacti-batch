@@ -1,10 +1,10 @@
-import { Contract, providers } from "ethers";
+import { Contract, ethers, Signer } from "ethers";
 import { SdkConfig } from "./types";
 import MULTI_SEND_ABI from './abi/multiSendAbi.json';
 
 
 export class TransactiBatch {
-  private provider: providers.Provider;
+  private provider: ethers.providers.Provider;
   private contract: Contract;
   private contractAddress: string;
   private defaultGasLimit?: number;
@@ -17,7 +17,7 @@ export class TransactiBatch {
   constructor(config: SdkConfig) {
     // Provider setup
     if (typeof config.provider === 'string') {
-      this.provider = new providers.JsonRpcProvider(config.provider);
+      this.provider = new ethers.providers.JsonRpcProvider(config.provider);
     } else {
       this.provider = config.provider;
     }
@@ -26,5 +26,39 @@ export class TransactiBatch {
     this.contract = new Contract(this.contractAddress, MULTI_SEND_ABI, this.provider);
     this.defaultGasLimit = config.defaultGasLimit;
     this.defaultGasPrice = config.defaultGasPrice;
+  }
+
+  /**
+ * Connect a signer to the SDK
+ * @param signer An ethers.js signer
+ * @returns A new instance of TransactiBatch SDK with the signer connected
+ */
+  connect(signer: Signer): TransactiBatch {
+    this.contract = this.contract.connect(signer);
+    return this;
+  }
+
+  /**
+   * Fetch the current provider
+   * @returns The current ethers.js provider
+   */
+  getProvider(): ethers.providers.Provider {
+    return this.provider;
+  }
+
+  /**
+   * Fetch the contract interface
+   * @returns The ethers.js contract interface
+   */
+  getContract(): Contract {
+    return this.contract;
+  }
+
+  /**
+   * Fetch the contract address
+   * @returns The contract address
+   */
+  getContractAddress(): string {
+    return this.contractAddress;
   }
 }
