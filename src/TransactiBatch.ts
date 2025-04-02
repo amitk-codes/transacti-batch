@@ -1,5 +1,5 @@
 import { BigNumber, Contract, ethers, Signer } from "ethers";
-import { EthBatchParams, GasEstimation, SdkConfig, TransactionOptions } from "./types";
+import { EthBatchParams, EthEqualBatchParams, GasEstimation, SdkConfig, TransactionOptions } from "./types";
 import MULTI_SEND_ABI from './abi/multiSendAbi.json';
 import { estimateGas, getRecommendedGasPrice } from "./utils/gasEstimator";
 
@@ -137,6 +137,68 @@ export class TransactiBatch {
       this.contract,
       'multiTransfer_OST',
       [addresses, amounts],
+      totalValue.toString(),
+      options
+    );
+  }
+
+
+  /**
+ * Send equal amounts of ETH to multiple recipients
+ * @param params Parameters for the batch transaction
+ * @param options Transaction options
+ * @returns A promise that resolves to the transaction response
+ */
+  async sendEthEqualBatch(
+    params: EthEqualBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<ethers.providers.TransactionResponse> {
+    const { addresses, amount } = params;
+
+    if (!addresses || addresses.length === 0) {
+      throw new Error('No addresses provided');
+    }
+
+    // Calculate total value to send
+    const amountBN = ethers.BigNumber.from(amount);
+    const totalValue = amountBN.mul(addresses.length);
+
+    // Set transaction options
+    const txOptions = {
+      gasLimit: options.gasLimit || this.defaultGasLimit,
+      gasPrice: options.gasPrice || this.defaultGasPrice,
+      value: totalValue.toString(),
+      nonce: options.nonce
+    };
+
+    // Send the transaction
+    return this.contract.multiTransferEqual_L1R(addresses, amountBN, txOptions);
+  }
+
+  /**
+   * Estimate gas for equal ETH batch transaction
+   * @param params Parameters for the batch transaction
+   * @param options Transaction options
+   * @returns A promise that resolves to a GasEstimation object
+   */
+  async estimateEthEqualBatchGas(
+    params: EthEqualBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<GasEstimation> {
+    const { addresses, amount } = params;
+
+    if (!addresses || addresses.length === 0) {
+      throw new Error('No addresses provided');
+    }
+
+    // Calculate total value to send
+    const amountBN = ethers.BigNumber.from(amount);
+    const totalValue = amountBN.mul(addresses.length);
+
+    return estimateGas(
+      this.contract,
+      'multiTransferEqual_L1R',
+      [addresses, amountBN],
       totalValue.toString(),
       options
     );

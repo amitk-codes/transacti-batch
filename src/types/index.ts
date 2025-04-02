@@ -16,6 +16,11 @@ export interface EthBatchParams {
   recipients: Recipient[];
 }
 
+export interface EthEqualBatchParams {
+  addresses: string[];
+  amount: string; // in wei
+}
+
 export interface TransactionOptions {
   gasLimit?: number;
   gasPrice?: string;
@@ -26,4 +31,4 @@ export interface GasEstimation {
   gasLimit: BigNumber;
   gasPrice: BigNumber;
   totalCost: BigNumber;
-} 
+}
