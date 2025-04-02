@@ -49,3 +49,56 @@ export async function hasEnoughAllowance(
     const allowance = await tokenContract.allowance(ownerAddress, spenderAddress);
     return allowance.gte(amountNeeded);
 }
+
+
+/**
+ * Get information about an ERC20 token
+ * @param tokenAddress The address of the ERC20 token
+ * @param provider An ethers.js provider
+ * @returns A promise that resolves to an object with token information
+ */
+export async function getTokenInfo(
+    tokenAddress: string,
+    provider: ethers.providers.Provider
+): Promise<{
+    name: string;
+    symbol: string;
+    decimals: number;
+    totalSupply: BigNumber;
+}> {
+    const tokenContract = getERC20Contract(tokenAddress, provider);
+
+    const [name, symbol, decimals, totalSupply] = await Promise.all([
+        tokenContract.name(),
+        tokenContract.symbol(),
+        tokenContract.decimals(),
+        tokenContract.totalSupply()
+    ]);
+
+    return {
+        name,
+        symbol,
+        decimals,
+        totalSupply
+    };
+}
+
+/**
+ * Format a token amount from wei to a human-readable format
+ * @param amount The amount in wei (or smallest token unit)
+ * @param decimals The number of decimals the token has
+ * @returns A formatted string representation of the amount
+ */
+export function formatTokenAmount(amount: BigNumber, decimals: number): string {
+    return ethers.utils.formatUnits(amount, decimals);
+}
+
+/**
+ * Parse a token amount from a human-readable format to wei
+ * @param amount The amount as a string
+ * @param decimals The number of decimals the token has
+ * @returns A BigNumber representing the amount in wei (or smallest token unit)
+ */
+export function parseTokenAmount(amount: string, decimals: number): BigNumber {
+    return ethers.utils.parseUnits(amount, decimals);
+}
