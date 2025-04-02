@@ -10,7 +10,10 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@types/node": "^22.13.17",
+    "ethers": "^5.7.2",
     "typescript": "^5.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.17"
   }
 }
