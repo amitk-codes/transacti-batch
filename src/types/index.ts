@@ -21,6 +21,17 @@ export interface EthEqualBatchParams {
   amount: string; // in wei
 }
 
+export interface TokenBatchParams {
+  tokenAddress: string;
+  recipients: Recipient[];
+}
+
+export interface TokenEqualBatchParams {
+  tokenAddress: string;
+  addresses: string[];
+  amount: string; // in token minimal unit
+}
+
 export interface TransactionOptions {
   gasLimit?: number;
   gasPrice?: string;

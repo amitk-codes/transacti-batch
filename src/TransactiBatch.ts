@@ -1,7 +1,8 @@
 import { BigNumber, Contract, ethers, Signer } from "ethers";
-import { EthBatchParams, EthEqualBatchParams, GasEstimation, SdkConfig, TransactionOptions } from "./types";
+import { EthBatchParams, EthEqualBatchParams, GasEstimation, SdkConfig, TokenBatchParams, TokenEqualBatchParams, TransactionOptions } from "./types";
 import MULTI_SEND_ABI from './abi/multiSendAbi.json';
 import { estimateGas, getRecommendedGasPrice } from "./utils/gasEstimator";
+import { hasEnoughAllowance } from "./utils/erc20";
 
 
 export class TransactiBatch {
@@ -203,5 +204,178 @@ export class TransactiBatch {
       options
     );
   }
+
+
+  /**
+ * Send ERC-20 tokens to multiple recipients with different amounts
+ * @param params Parameters for the batch transaction
+ * @param options Transaction options
+ * @returns A promise that resolves to the transaction response
+ */
+  async sendTokenBatch(
+    params: TokenBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<ethers.providers.TransactionResponse> {
+    const { tokenAddress, recipients } = params;
+
+    if (!recipients || recipients.length === 0) {
+      throw new Error('No recipients provided');
+    }
+
+    if (!this.contract.signer) {
+      throw new Error('No signer provided. Call connect() to provide a signer.');
+    }
+
+    // Split addresses and amounts
+    const addresses = recipients.map(r => r.address);
+    const amounts = recipients.map(r => ethers.BigNumber.from(r.amount));
+
+    // Calculate total token amount
+    const totalAmount = amounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+
+    // Check allowance
+    const signerAddress = await this.contract.signer.getAddress();
+    const hasAllowance = await hasEnoughAllowance(
+      tokenAddress,
+      signerAddress,
+      this.contractAddress,
+      totalAmount,
+      this.provider
+    );
+
+    if (!hasAllowance) {
+      throw new Error(`Insufficient token allowance. Please approve the contract to spend at least ${totalAmount.toString()} tokens.`);
+    }
+
+    const txOptions = {
+      gasLimit: options.gasLimit || this.defaultGasLimit,
+      gasPrice: options.gasPrice || this.defaultGasPrice,
+      nonce: options.nonce
+    };
+
+    // Send the transaction
+    return this.contract.multiTransferToken_a4A(
+      tokenAddress,
+      addresses,
+      amounts,
+      totalAmount,
+      txOptions
+    );
+  }
+
+  /**
+   * Estimate gas for token batch transaction
+   * @param params Parameters for the batch transaction
+   * @param options Transaction options
+   * @returns A promise that resolves to a GasEstimation object
+   */
+  async estimateTokenBatchGas(
+    params: TokenBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<GasEstimation> {
+    const { tokenAddress, recipients } = params;
+
+    if (!recipients || recipients.length === 0) {
+      throw new Error('No recipients provided');
+    }
+
+    // Split addresses and amounts
+    const addresses = recipients.map(r => r.address);
+    const amounts = recipients.map(r => ethers.BigNumber.from(r.amount));
+
+    // Calculate total token amount
+    const totalAmount = amounts.reduce((acc, amount) => acc.add(amount), ethers.BigNumber.from(0));
+
+    return estimateGas(
+      this.contract,
+      'multiTransferToken_a4A',
+      [tokenAddress, addresses, amounts, totalAmount],
+      '0',
+      options
+    );
+  }
+
+  /**
+   * Send equal amounts of ERC-20 tokens to multiple recipients
+   * @param params Parameters for the batch transaction
+   * @param options Transaction options
+   * @returns A promise that resolves to the transaction response
+   */
+  async sendTokenEqualBatch(
+    params: TokenEqualBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<ethers.providers.TransactionResponse> {
+    const { tokenAddress, addresses, amount } = params;
+
+    if (!addresses || addresses.length === 0) {
+      throw new Error('No addresses provided');
+    }
+
+    // Ensure the contract has a signer
+    if (!this.contract.signer) {
+      throw new Error('No signer provided. Call connect() to provide a signer.');
+    }
+
+    // Calculate total token amount
+    const amountBN = ethers.BigNumber.from(amount);
+    const totalAmount = amountBN.mul(addresses.length);
+
+    // Check allowance
+    const signerAddress = await this.contract.signer.getAddress();
+    const hasAllowance = await hasEnoughAllowance(
+      tokenAddress,
+      signerAddress,
+      this.contractAddress,
+      totalAmount,
+      this.provider
+    );
+
+    if (!hasAllowance) {
+      throw new Error(`Insufficient token allowance. Please approve the contract to spend at least ${totalAmount.toString()} tokens.`);
+    }
+
+    // Set transaction options
+    const txOptions = {
+      gasLimit: options.gasLimit || this.defaultGasLimit,
+      gasPrice: options.gasPrice || this.defaultGasPrice,
+      nonce: options.nonce
+    };
+
+    // Send the transaction
+    return this.contract.multiTransferTokenEqual_71p(
+      tokenAddress,
+      addresses,
+      amountBN,
+      txOptions
+    );
+  }
+
+  /**
+   * Estimate gas for equal token batch transaction
+   * @param params Parameters for the batch transaction
+   * @param options Transaction options
+   * @returns A promise that resolves to a GasEstimation object
+   */
+  async estimateTokenEqualBatchGas(
+    params: TokenEqualBatchParams,
+    options: TransactionOptions = {}
+  ): Promise<GasEstimation> {
+    const { tokenAddress, addresses, amount } = params;
+
+    if (!addresses || addresses.length === 0) {
+      throw new Error('No addresses provided');
+    }
+
+    const amountBN = ethers.BigNumber.from(amount);
+
+    return estimateGas(
+      this.contract,
+      'multiTransferTokenEqual_71p',
+      [tokenAddress, addresses, amountBN],
+      '0',
+      options
+    );
+  }
+
 
 }
